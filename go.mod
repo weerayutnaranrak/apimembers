@@ -1,4 +1,4 @@
-module apimemberapp
+module github.com/callicoder/apimemberapp
 
 go 1.14
 

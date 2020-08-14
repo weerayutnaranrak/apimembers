@@ -11,24 +11,77 @@ import (
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-
-	"./helper"
-	"./models"
-
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 )
+
+
+
+
+
+
+func ConnectDB() *mongo.Collection {
+
+	clientOptions := options.Client().ApplyURI("mongodb+srv://appdemo:appdemo@cluster0.sdgiz.mongodb.net/demoapp?retryWrites=true&w=majority")
+
+	client, err := mongo.Connect(context.TODO(), clientOptions)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Connected to MongoDB!")
+
+	collection := client.Database("go_rest_api").Collection("members")
+
+	return collection
+}
+
+
+type ErrorResponse struct {
+	StatusCode   int    `json:"status"`
+	ErrorMessage string `json:"message"`
+}
+
+
+func GetError(err error, w http.ResponseWriter) {
+
+	log.Fatal(err.Error())
+	var response = ErrorResponse{
+		ErrorMessage: err.Error(),
+		StatusCode:   http.StatusInternalServerError,
+	}
+
+	message, _ := json.Marshal(response)
+
+	w.WriteHeader(response.StatusCode)
+	w.Write(message)
+}
+
+
+type Member struct {
+	ID     primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	Name   string             `json:"name,omitempty" bson:"name,omitempty"`
+	Lastname  string             `json:"lastname" bson:"lastname,omitempty"`
+	Age    string         `json:"age" bson:"age,omitempty"`
+	Job    string         `json:"job" bson:"job,omitempty"`
+	Status    string         `json:"status" bson:"status,omitempty"`
+	Address    string         `json:"address" bson:"address,omitempty"`
+}
+
 
 func getMembers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var members []models.Member
+	var members []Member
 
-	collection := helper.ConnectDB()
+	collection := ConnectDB()
 
 	cur, err := collection.Find(context.TODO(), bson.M{})
 
 	if err != nil {
-		helper.GetError(err, w)
+		GetError(err, w)
 		return
 	}
 
@@ -36,7 +89,7 @@ func getMembers(w http.ResponseWriter, r *http.Request) {
 
 	for cur.Next(context.TODO()) {
 
-		var member models.Member
+		var member Member
 
 		err := cur.Decode(&member) 
 		if err != nil {
@@ -57,20 +110,19 @@ func getMember(w http.ResponseWriter, r *http.Request) {
 	// set header.
 	w.Header().Set("Content-Type", "application/json")
 
-	var member models.Member
-	// we get params with mux.
+	var member Member
+
 	var params = mux.Vars(r)
 
-	// string to primitive.ObjectID
 	id, _ := primitive.ObjectIDFromHex(params["id"])
 
-	collection := helper.ConnectDB()
+	collection := ConnectDB()
 
 	filter := bson.M{"_id": id}
 	err := collection.FindOne(context.TODO(), filter).Decode(&member)
 
 	if err != nil {
-		helper.GetError(err, w)
+		GetError(err, w)
 		return
 	}
 
@@ -80,19 +132,19 @@ func getMember(w http.ResponseWriter, r *http.Request) {
 func createMember(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var member models.Member
+	var member Member
 
 	// we decode our body request params
 	_ = json.NewDecoder(r.Body).Decode(&member)
 
 	// connect db
-	collection := helper.ConnectDB()
+	collection := ConnectDB()
 
 	// insert our member model.
 	result, err := collection.InsertOne(context.TODO(), member)
 
 	if err != nil {
-		helper.GetError(err, w)
+		GetError(err, w)
 		return
 	}
 
@@ -106,9 +158,9 @@ func updateMember(w http.ResponseWriter, r *http.Request) {
 
 	id, _ := primitive.ObjectIDFromHex(params["id"])
 
-	var member models.Member
+	var member Member
 
-	collection := helper.ConnectDB()
+	collection := ConnectDB()
 
 	filter := bson.M{"_id": id}
 
@@ -129,7 +181,7 @@ func updateMember(w http.ResponseWriter, r *http.Request) {
 	err := collection.FindOneAndUpdate(context.TODO(), filter, update).Decode(&member)
 
 	if err != nil {
-		helper.GetError(err, w)
+		GetError(err, w)
 		return
 	}
 
@@ -145,14 +197,14 @@ func deleteMember(w http.ResponseWriter, r *http.Request) {
 
 	id, err := primitive.ObjectIDFromHex(params["id"])
 
-	collection := helper.ConnectDB()
+	collection := ConnectDB()
 
 	filter := bson.M{"_id": id}
 
 	deleteResult, err := collection.DeleteOne(context.TODO(), filter)
 
 	if err != nil {
-		helper.GetError(err, w)
+		GetError(err, w)
 		return
 	}
 
